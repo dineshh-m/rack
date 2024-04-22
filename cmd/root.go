@@ -16,6 +16,7 @@ import (
 var (
   fileType string
   isAllFiles *bool
+  isMoveEnable *bool
   rootCmd = &cobra.Command{
     Use:   "rack",
     Short: "A command-line utility to keep your files organized",
@@ -50,9 +51,9 @@ func init() {
 	// when this action is called directly.
   rootCmd.Flags().StringVarP(&fileType, "type", "t", "", "Specifies the type of files or file extensions")
   isAllFiles = rootCmd.Flags().BoolP("allfiles", "a", false, "Organize all files into its own directories")
+  isMoveEnable = rootCmd.Flags().BoolP("move", "m", false, "Move the files rather than copying")
   rootCmd.MarkFlagsOneRequired("type", "allfiles")
   rootCmd.MarkFlagsMutuallyExclusive("type", "allfiles")
-  // rootCmd.MarkFlagRequired("type")
 }
 
 func run(fileType, sourceDir string, target string) error {
@@ -62,8 +63,8 @@ func run(fileType, sourceDir string, target string) error {
   }
 
   if *isAllFiles {
-    return fileio.OrganizeFiles(sourceDir, target)
+    return fileio.OrganizeFiles(sourceDir, target, *isMoveEnable)
   }
 
-  return fileio.CopyFiles(sourceDir, target, fileType)
+  return fileio.CopyFiles(sourceDir, target, fileType, *isMoveEnable)
 }

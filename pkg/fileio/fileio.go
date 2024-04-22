@@ -1,13 +1,13 @@
 package fileio
 
 import (
-	"errors"
-	"fmt"
-	"io"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"strings"
+  "errors"
+  "fmt"
+  "io"
+  "io/ioutil"
+  "os"
+  "path/filepath"
+  "strings"
 )
 
 func IsDirExists(dirPath string) error {
@@ -18,7 +18,7 @@ func IsDirExists(dirPath string) error {
   return nil
 }
 
-func copyFile(srcPath, destPath string) error {
+func copyFile(srcPath, destFilePath string) error {
   srcFile, pErr := os.Open(srcPath)
   if pErr != nil {
     return errors.New("Error opening the file" + srcPath)
@@ -27,14 +27,14 @@ func copyFile(srcPath, destPath string) error {
   defer srcFile.Close()
 
   // Creating the destination directory if it doesn't exists
-  if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
-    return errors.New("Cannot create the directory at" + filepath.Dir(destPath))
+  if err := os.MkdirAll(filepath.Dir(destFilePath), 0755); err != nil {
+    return errors.New("Cannot create the directory at" + filepath.Dir(destFilePath))
   }
-  
+
   // creating the destination file 
-  destFile, err := os.Create(destPath)
+  destFile, err := os.Create(destFilePath)
   if err != nil {
-    return errors.New("Cannot the create file " + srcFile.Name() + " at " + filepath.Dir(destPath))
+    return errors.New("Cannot the create file " + srcFile.Name() + " at " + filepath.Dir(destFilePath))
   }
   defer destFile.Close()
 
@@ -49,7 +49,19 @@ func copyFile(srcPath, destPath string) error {
   return nil
 }
 
-func CopyFiles(sourceDir, destDir, fileType string) error {
+func moveFile(srcFilePath, destFilePath string) error {
+  destDirectory := filepath.Dir(destFilePath)
+  if err := os.MkdirAll(destDirectory, 644); err != nil {
+    return fmt.Errorf("Cannot create the destination directory: %s", destDirectory)
+  }
+  err := os.Rename(srcFilePath, destFilePath)
+  if err != nil {
+    return fmt.Errorf("Cannot move file: %s to %s", srcFilePath, destFilePath)
+  }
+  return nil
+}
+
+func CopyFiles(sourceDir, destDir, fileType string, moveEnabled bool) error {
   files, err := ioutil.ReadDir(sourceDir)
   if err != nil {
     return err
@@ -59,13 +71,17 @@ func CopyFiles(sourceDir, destDir, fileType string) error {
     if !file.IsDir() {
       filePath := filepath.Join(sourceDir, file.Name())
       destPath := filepath.Join(destDir, file.Name())
-      ext := strings.Split(file.Name(), ".")
-      if len(ext) >= 2 {
-        last := len(ext) - 1
-        if ext[last] == fileType {
-          err := copyFile(filePath, destPath)
+      fileExtension := getFileType(file.Name())
+      if fileExtension != "" {
+        if fileExtension == fileType {
+          var err error
+          if moveEnabled {
+            err = moveFile(filePath, destPath)
+          } else {
+            err = copyFile(filePath, destPath)
+          }
           if err != nil {
-            fmt.Fprintln(os.Stderr, err.Error())
+            fmt.Fprintf(os.Stderr, err.Error())
           }
         }
       }
@@ -79,14 +95,14 @@ func getFileType(fileName string) string {
   split := strings.Split(fileName, ".")
   if len(split) >= 2 {
     length := len(split)
-    ext := split[length - 1]
-    return ext
+    fileType := split[length - 1]
+    return fileType
   }
 
   return ""
 }
 
-func OrganizeFiles(sourceDir, destDir string) error {
+func OrganizeFiles(sourceDir, destDir string, moveEnabled bool) error {
   files, err := ioutil.ReadDir(sourceDir)
   if err != nil {
     return errors.New("Cannon read the directory" + sourceDir)
@@ -101,9 +117,14 @@ func OrganizeFiles(sourceDir, destDir string) error {
         os.Mkdir(destPath, 0644)
 
         destPath = filepath.Join(destPath, fileInfo.Name())
-        err := copyFile(srcPath, destPath)
+        var err error
+        if moveEnabled {
+          err = moveFile(srcPath, destPath)
+        } else {
+          err = copyFile(srcPath, destPath)
+        }
         if err != nil {
-          fmt.Fprintln(os.Stderr, "Cannot copy file ", srcPath)
+          fmt.Fprintf(os.Stderr, err.Error())
         }
       }
     } 
@@ -111,3 +132,4 @@ func OrganizeFiles(sourceDir, destDir string) error {
 
   return nil
 }
+
